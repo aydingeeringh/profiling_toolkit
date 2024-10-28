@@ -16,8 +16,8 @@ The setup script will check for and install required dependencies. If Docker is 
 ### 1. Clone the Repository
 
 ```bash
-git clone <repository-url>
-cd <project-directory>
+git clone aydingeeringh/profiling_toolkit
+cd profiling_toolkit
 ```
 
 ### 2. Run Setup Script
