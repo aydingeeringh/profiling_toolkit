@@ -1,6 +1,13 @@
 # System Requirements
 The InfoBlueprint data profiling tool requires python, git, Node.js 18 or 20, and NPM 7 or above.
 
+Click the green code button above to download the repository as a zip file or clone the repository using git.
+
+```bash
+git clone https://github.com/aydingeeringh/profiling_toolkit.git
+cd profiling_toolkit
+```
+
 ## Automatic install
 The easiest way to install the required dependencies is to use the provided `setup.sh` script. This script will install the required dependencies and start the application.
 
