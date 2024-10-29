@@ -7,8 +7,7 @@
 
 <EvidenceDefaultLayout 
     {data} 
-    fullWidth={true}
-    logo="static/images/logo.png"
+    logo="images/logo.png"
 >
 	<slot slot="content" />
 </EvidenceDefaultLayout>

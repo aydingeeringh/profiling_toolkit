@@ -1,0 +1,1 @@
+SELECT DISTINCT table_name FROM information_schema.columns;
