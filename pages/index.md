@@ -8,7 +8,7 @@ title: Profiling
       count(*) as columns,
       '/' || "table_name" as table_link
   from information_schema
-  where table_name not like '%pattern%' AND table_name not like '%summary%'
+  where table_schema = 'main'
   group by table_name
 ```
 

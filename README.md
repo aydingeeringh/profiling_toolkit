@@ -1,141 +1,79 @@
-I'll revise the README to be more streamlined, letting the setup script handle the dependency checks and installations. Here's the simplified version:
+# System Requirements
+The InfoBlueprint data profiling tool requires python, git, Node.js 18 or 20, and NPM 7 or above.
 
-# Project Setup
+## Automatic install
+The easiest way to install the required dependencies is to use the provided `setup.sh` script. This script will install the required dependencies and start the application.
 
-This README provides instructions for setting up a data pipeline using Airbyte for data ingestion, PostgreSQL for storage, and Evidence.dev for data profiling.
-
-## Prerequisites
-
-The setup script will check for and install required dependencies. If Docker is not installed, you'll need to install it first:
-
-- [Docker Desktop for Windows/Mac](https://www.docker.com/products/docker-desktop/)
-- [Docker Engine for Linux](https://docs.docker.com/engine/install/)
-
-## Installation Steps
-
-### 1. Clone the Repository
-
+#### On Mac/Linux systems:
 ```bash
-git clone aydingeeringh/profiling_toolkit
-cd profiling_toolkit
-```
-
-### 2. Run Setup Script
-
-```bash
-chmod +x setup.sh
 ./setup.sh
 ```
 
-The script will:
-- Check and install required dependencies (Git, Python, Node.js)
-- Create a Python virtual environment
-- Install Airbyte
-- Start PostgreSQL in Docker
-
-### 3. Configure Airbyte
-
-1. Access Airbyte UI at `http://localhost:8000`
-   - Use the credentials displayed in terminal
-   - If needed, run `abctl local credentials` to see credentials again
-
-2. Configure Your Source:
-   - Click "Sources" in the left sidebar
-   - Select your data source type
-   - Enter connection details
-   - Test and save the connection
-
-3. Configure PostgreSQL Destination:
-   - Click "Destinations"
-   - Select "PostgreSQL"
-   - Enter connection details:
-     ```
-     Host: host.docker.internal
-     Port: 5432
-     Database: postgres
-     Username: postgres
-     Password: postgres
-     ```
-   - Test and save the connection
-
-4. Create Connection:
-   - Go to "Connections""
-   - Select your source and destination
-   - Configure sync settings
-   - Start the sync
-
-### 4. Run Tasks
-
-With the virtual environment activated (it should show `.env` in the terminal prompt), run the following tasks:
-
+#### On Windows PowerShell: 
 ```bash
-# Run all tasks
-invoke all
-
-# Or run individual tasks:
-invoke setup     # Install npm dependencies (dependencies for profiling report ui)
-invoke profile   # Run data profiling (queries the data loaded into PostgreSQL by Airbyte)
-invoke sources   # Generate source files (Caches the profiling results so the report can display the data)
-invoke report    # Start Evidence.dev report (Starts the report UI)
+.\setup.sh
 ```
 
-### 5. View Reports and Logs
-
-#### Access Applications
-- Evidence.dev Report: `http://localhost:3000`
-- Airbyte UI: `http://localhost:8000`
-
-#### View Docker Logs
-Using Docker Desktop:
-1. Open Docker Desktop
-2. Click "Containers"
-3. Click container name to view:
-   - Live logs
-   - Performance metrics
-   - Container details
-
-Using Command Line:
+#### On Windows CMD: 
 ```bash
-# View PostgreSQL logs
-docker compose logs postgres
-
-# View Airbyte logs
-docker compose logs airbyte-abctl-control-plane
-
-# Follow logs in real-time
-docker compose logs -f [container_name]
+bash setup.sh # requires Git Bash or similar
 ```
 
-### Maintenance
+If you would rather install the dependencies manually, you can follow the instructions below.
 
-#### Stop Services
+## Manual install
+Check your versions with `python --version`, `node -v` and `npm -v`
+
+**Note:** if you are installing NodeJS for the first time, be sure to install the Long term suppport (LTS) version. 
+
+> [Download Node.js + NPM (LTS version)](https://nodejs.org/en/download)
+
+If you are installing python for the first time you can install it here.
+
+[Download Python](https://www.python.org/downloads/)
+
+### Updating
+Update to the latest npm version with npm install -g npm@latest
+
+### Git
+Evidence requires git. If you do not already have git installed, you can follow the [instructions here](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git).
+
+We also recommend signing up for [GitHub](https://github.com/)
+
+# Profiling instructions
+## Connnecting to a Data Source
+If you followed the automatic install the application should be running on [http://localhost:3000](http://localhost:3000) and would have opened in your default browser. If you are running the application manually, you can run `invoke init`.
+
+1. Click the `•••` icon in the top right corner of the screen.
+
+    <img src="./docs/images/homepage.png" />
+
+
+2. Click `Settings` or use the [Settings URL](http://localhost:3000/settings/).
+
+    <img src="./docs/images/settings.png" width="15%" />
+
+3. Click `Add new source`
+
+    <img src="./docs/images/new_source.png" width="50%" />
+
+4. Choose the datasource type and give it a name.
+5. Fill in the required fields and click `Test Connection`.
+6. If the connection is successful, click `Confirm Changes`.
+
+## Load tables
+In the repo there is a folder called **sources** and you should see a subfolder with the name of the datasource you just created.
+To profile the tables you need to add a sql file for each table you would like to profile. For example if you have a table called `customers` in the `main` schema you would add a file called `customers.sql` to the datasource folder, with the file containing `select * from main.customers` (You do not need to add a `;` at the end of the query). You can check if the tables have been loaded by clicking the `•••` icon in the top right corner of the screen and clicking `Schema Viewer` or using the [Schema URL](http://localhost:3000/explore/schema/).
+
+## Profiling
+To profile the tables you have loaded you can run the following command in the terminal:
 ```bash
-# Stop PostgreSQL and Airbyte
-docker compose down
-
-# Stop Evidence.dev (in the running terminal)
-Ctrl+C
+invoke profile
 ```
 
-#### Restart Services
+Once the profiling is complete you can refresh the home page and the tables should be visible!
+
+**Note:** If you want to delete the demo `orders` table, you can run 
 ```bash
-# Restart all containers
-docker compose restart
-
-# Restart specific container
-docker compose restart postgres
-docker compose restart airbyte
+invoke del -n orders # any table can be deleted this way
 ```
-
-#### Update Data
-1. Trigger sync in Airbyte UI
-2. Run `invoke profile` to update profiling
-3. Evidence.dev report will auto-update if running, otherwise run `invoke sources` and `invoke report`
-
-## Troubleshooting
-
-- **Docker Issues**: Ensure Docker Desktop is running
-- **Airbyte Credentials**: Run `abctl local credentials`
-- **Container Status**: Run `docker compose ps`
-- **Detailed Logs**: Run `docker compose logs [container_name]`
-- **Setup Issues**: Check `setup.sh` output for specific error messages

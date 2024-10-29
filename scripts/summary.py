@@ -102,5 +102,5 @@ def create_summary_tables(duckdb_path: str):
     con.close()
 
 if __name__ == "__main__":
-    duckdb_path = 'sources/needful_things/needful_things.duckdb'
+    duckdb_path = 'sources/profiling/database.duckdb'
     create_summary_tables(duckdb_path)

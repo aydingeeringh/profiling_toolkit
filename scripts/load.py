@@ -13,7 +13,7 @@ def load_parquet_files_to_duckdb(base_dir: str, duckdb_path: str):
     # Get all parquet files
     base_path = pathlib.Path(base_dir)
     for db_dir in base_path.iterdir():
-        if not db_dir.is_dir() or db_dir.name == 'needful_things':
+        if not db_dir.is_dir() or db_dir.name == 'profiling':
             continue
             
         for table_dir in db_dir.iterdir():
@@ -33,7 +33,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Load parquet files into DuckDB')
     parser.add_argument('--base-dir', default='.evidence/template/static/data',
                       help='Base directory containing parquet files')
-    parser.add_argument('--duckdb-path', default='sources/needful_things/needful_things.duckdb',
+    parser.add_argument('--duckdb-path', default='sources/profiling/database.duckdb',
                       help='Path to DuckDB database')
     
     args = parser.parse_args()

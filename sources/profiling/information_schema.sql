@@ -1,1 +1,6 @@
-SELECT DISTINCT table_name FROM information_schema.columns;
+select 
+    table_catalog, 
+    table_schema, 
+    table_name, 
+    column_name 
+from information_schema.columns

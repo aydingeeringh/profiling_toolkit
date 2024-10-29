@@ -4,7 +4,7 @@ import duckdb
 
 def generate_sql_files():
     # Connect to DuckDB database
-    db_path = 'sources/needful_things/needful_things.duckdb'
+    db_path = 'sources/profiling/database.duckdb'
     conn = duckdb.connect(db_path)
     
     try:
@@ -24,7 +24,7 @@ def generate_sql_files():
             schema_tables[schema].append(table)
         
         # Base directory for SQL files
-        base_dir = Path('sources/needful_things')
+        base_dir = Path('sources/profiling')
         
         # Process each schema and its tables
         for schema, table_names in schema_tables.items():
