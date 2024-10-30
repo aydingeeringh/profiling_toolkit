@@ -16,14 +16,9 @@ The easiest way to install the required dependencies is to use the provided `set
 ./setup.sh
 ```
 
-#### On Windows PowerShell: 
+#### On Windows: 
 ```bash
-.\setup.sh
-```
-
-#### On Windows CMD: 
-```bash
-bash setup.sh # requires Git Bash or similar
+.\setup.bat # You can also double click the file
 ```
 
 If you would rather install the dependencies manually, you can follow the instructions below.
