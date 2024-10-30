@@ -5,6 +5,21 @@ check_command() {
     command -v "$1" >/dev/null 2>&1
 }
 
+# Function to update PATH and source profile
+update_path() {
+    # Add cargo bin to PATH
+    export PATH="$HOME/.cargo/bin:$PATH"
+    
+    # Add to appropriate profile file
+    if [[ -f "$HOME/.zshrc" ]]; then
+        echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> "$HOME/.zshrc"
+        source "$HOME/.zshrc"
+    elif [[ -f "$HOME/.bashrc" ]]; then
+        echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> "$HOME/.bashrc"
+        source "$HOME/.bashrc"
+    fi
+}
+
 # Create a temporary Windows batch script for CMD operations
 create_windows_script() {
     cat > setup.bat << 'EOL'
@@ -40,6 +55,8 @@ where uv >nul 2>&1
 if %ERRORLEVEL% NEQ 0 (
     echo Installing uv...
     powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+    REM Update PATH for current session
+    set "PATH=%USERPROFILE%\.cargo\bin;%PATH%"
 )
 
 REM Verify installations
@@ -51,7 +68,9 @@ uv --version
 
 REM Initialize project
 echo Initializing project...
-uv init
+uv venv
+uv pip install invoke
+invoke init
 npm install
 npm run sources
 npm run dev
@@ -88,6 +107,8 @@ if (Get-Command npm -ErrorAction SilentlyContinue) {
 if (!(Get-Command uv -ErrorAction SilentlyContinue)) {
     Write-Host "Installing uv..."
     iex (irm https://astral.sh/uv/install.ps1)
+    # Update PATH for current session
+    $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
 }
 
 # Verify installations
@@ -99,7 +120,9 @@ uv --version
 
 # Initialize project
 Write-Host "Initializing project..."
-uv init
+uv venv
+uv pip install invoke
+invoke init
 npm install
 npm run sources
 npm run dev
@@ -168,6 +191,8 @@ else
     if ! check_command "uv"; then
         echo "Installing uv..."
         curl -LsSf https://astral.sh/uv/install.sh | sh
+        # Update PATH immediately after installation
+        update_path
     fi
     
     # Verify installations
@@ -180,7 +205,11 @@ else
     # Initialize project
     echo "Initializing project..."
     uv venv
+    uv pip install invoke
     invoke init
+    npm install
+    npm run sources
+    npm run dev
 fi
 
 echo "Setup complete!"
