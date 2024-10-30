@@ -39,6 +39,18 @@ If you are installing python for the first time you can install it here.
 
 [Download Python](https://www.python.org/downloads/)
 
+This project uses uv to manage python dependencies and can be installed using the following command:
+
+#### Mac/Linux:
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+#### Windows:
+```bash
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
 ### Updating
 Update to the latest npm version with npm install -g npm@latest
 
