@@ -1,11 +1,16 @@
-.evidence/template
-.svelte-kit
-build
-node_modules
-.DS_Store
-static/data
-*.options.yaml
-.vscode/settings.json
-.env
-.evidence/meta
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
 .venv
+uv.lock
+pyproject.toml
+.python-version
+data_profiles/
+connections.json
+profiles.db

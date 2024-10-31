@@ -1,2 +1,7 @@
+streamlit
+watchdog
+ibis-framework
+psycopg2
 duckdb
-invoke
+pandas
+pyarrow_hotfix

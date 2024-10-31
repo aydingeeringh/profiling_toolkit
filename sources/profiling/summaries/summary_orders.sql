@@ -1,1 +1,0 @@
-select * from summaries.summary_orders
