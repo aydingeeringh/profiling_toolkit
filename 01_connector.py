@@ -2,6 +2,8 @@ import streamlit as st
 import ibis
 import json
 from pathlib import Path
+import pandas as pd
+from typing import Optional, List
 
 def load_saved_connections():
     """Load saved connections from a JSON file"""
@@ -52,6 +54,14 @@ def get_connection_params(db_type):
             "user": "",
             "password": ""
         },
+        "MSSQL": {  # Add MSSQL parameters
+            "host": "localhost",
+            "port": "1433",
+            "database": "",
+            "user": "",
+            "password": "",
+            "driver": "ODBC Driver 17 for SQL Server"  # Default SQL Server driver
+        },
         "SQLite": {
             "database": "path/to/database.db"
         },
@@ -100,6 +110,15 @@ def create_connection(db_type, params):
                 user=params["user"],
                 password=params["password"]
             )
+        elif db_type == "MSSQL":  # Add MSSQL connection
+            connection_string = (
+                f"DRIVER={{{params['driver']}}};"
+                f"SERVER={params['host']},{params['port']};"
+                f"DATABASE={params['database']};"
+                f"UID={params['user']};"
+                f"PWD={params['password']}"
+            )
+            return ibis.mssql.connect(connection_string)
         elif db_type == "SQLite":
             return ibis.sqlite.connect(params["database"])
         elif db_type == "Snowflake":
@@ -127,6 +146,7 @@ def main():
         "ClickHouse",
         "DuckDB",
         "MySQL",
+        "MSSQL",
         "Postgres",
         "SQLite",
         "Snowflake"
