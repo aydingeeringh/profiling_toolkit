@@ -14,3 +14,4 @@ pyproject.toml
 data_profiles/
 connections.json
 profiles.db
+pages/test*

@@ -1,7 +1,11 @@
 streamlit
+streamlit-aggrid
 watchdog
 ibis-framework
+ibis-framework[duckdb]
+ibis-framework[mssql]
 psycopg2
 duckdb
 pandas
 pyarrow_hotfix
+pyodbc

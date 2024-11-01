@@ -5,6 +5,7 @@ from pathlib import Path
 import pandas as pd
 import duckdb
 from datetime import datetime
+from typing import Dict, Any, Optional
 
 def load_saved_connections():
     """Load saved connections from a JSON file"""
@@ -14,32 +15,16 @@ def load_saved_connections():
             return json.load(f)
     return {}
 
-def create_connection(db_type, params):
+def create_connection(db_type: str, params: Dict[str, Any]) -> Optional[ibis.BaseBackend]:
     """Create database connection using Ibis"""
     try:
-        # Convert database type to lowercase for ibis connection string
-        db_type_lower = db_type.lower()
+        connection_method = getattr(ibis, db_type.lower())
         
-        # Handle special cases for database names
-        db_mapping = {
-            "postgres": "postgres",
-            "bigquery": "bigquery",
-            "clickhouse": "clickhouse",
-            "duckdb": "duckdb",
-            "mysql": "mysql",
-            "sqlite": "sqlite",
-            "snowflake": "snowflake"
-        }
-        
-        # Get the correct database name for ibis
-        db_name = db_mapping.get(db_type_lower, db_type_lower)
-        
-        # Create the connection dynamically
-        connect_func = getattr(ibis, db_name).connect
-        
-        # Connect using the parameters
-        return connect_func(**params)
-    
+        # For databases that only need a path parameter, pass the path string directly
+        if len(params) == 1 and "path" in params:
+            return connection_method.connect(params["path"])
+            
+        return connection_method.connect(**params)
     except Exception as e:
         st.error(f"Connection error: {str(e)}")
         return None
@@ -47,11 +32,11 @@ def create_connection(db_type, params):
 def get_schema_info(connection):
     """Get schema and table information using Ibis"""
     try:
-        schemas = connection.list_schemas()
+        schemas = connection.list_databases()
         schema_tables = {}
         
         for schema in schemas:
-            tables = connection.list_tables(schema=schema)
+            tables = connection.list_tables(database=schema)
             if tables:  # Only add schemas that have tables
                 schema_tables[schema] = tables
                 
@@ -71,7 +56,7 @@ def get_table_schema(connection, table, schema=None):
     try:
         # Get table reference
         if schema and schema != "default":
-            table_obj = connection.table(table, schema=schema)
+            table_obj = connection.table(table, database=schema)
         else:
             table_obj = connection.table(table)
         
@@ -167,8 +152,8 @@ def generate_profile(connection, schema, table, progress_bar, connection_name):
             summary_data.append({
                 'column_name': col,
                 'row_count': int(total_rows),
-                'null_count': int(results['null_count']),
-                'unique_count': int(results['unique_count']),
+                'null_count': int(results['null_count'].iloc[0]),
+                'unique_count': int(results['unique_count'].iloc[0]),
                 'schema_name': schema,
                 'table_name': table,
                 'profile_date': datetime.now(),
@@ -288,54 +273,68 @@ def main():
                             table_data.append({
                                 "Schema": schema,
                                 "Table": table,
-                                "Selected": (schema, table) in st.session_state.selected_tables
+                                "Select": (schema, table) in st.session_state.selected_tables
                             })
-
-                # Add previously selected tables that might be filtered out
-                for schema, table in st.session_state.selected_tables:
-                    if not any(d["Schema"] == schema and d["Table"] == table for d in table_data):
-                        table_data.append({
-                            "Schema": schema,
-                            "Table": table,
-                            "Selected": True
-                        })
 
                 # Convert to DataFrame and sort
                 df = pd.DataFrame(table_data)
                 if not df.empty:
                     df = df.sort_values(["Schema", "Table"])
 
+                    # Function to handle selection changes
+                    def handle_selection():
+                        if 'table_editor' in st.session_state:
+                            edited_data = st.session_state.table_editor
+                            
+                            # Get the current DataFrame
+                            current_df = df.copy()
+                            
+                            # Update the selections based on edited rows
+                            for row_idx, changes in edited_data['edited_rows'].items():
+                                row_idx = int(row_idx)
+                                if 'Select' in changes:
+                                    row = current_df.iloc[row_idx]
+                                    if changes['Select']:
+                                        st.session_state.selected_tables.add((row['Schema'], row['Table']))
+                                    else:
+                                        st.session_state.selected_tables.discard((row['Schema'], row['Table']))
+
                     # Display editable table with checkboxes
                     edited_df = st.data_editor(
                         df,
                         column_config={
-                            "Schema": "Schema",
-                            "Table": "Table",
-                            "Selected": st.column_config.CheckboxColumn(
+                            "Schema": st.column_config.TextColumn(
+                                "Schema",
+                                disabled=True,
+                            ),
+                            "Table": st.column_config.TextColumn(
+                                "Table",
+                                disabled=True,
+                            ),
+                            "Select": st.column_config.CheckboxColumn(
                                 "Select",
                                 help="Select table for profiling",
-                                default=False
                             )
                         },
                         hide_index=True,
-                        disabled=["Schema", "Table"]
+                        key="table_editor",
+                        on_change=handle_selection
                     )
-
-                    # Update selected tables automatically based on checkbox state
-                    st.session_state.selected_tables = {
-                        (row["Schema"], row["Table"]) 
-                        for _, row in edited_df[edited_df["Selected"]].iterrows()
-                    }
 
                     # Display selected tables
                     if st.session_state.selected_tables:
                         st.subheader("Selected Tables")
                         selected_df = pd.DataFrame([
                             {"Schema": schema, "Table": table}
-                            for schema, table in st.session_state.selected_tables
-                        ]).sort_values(["Schema", "Table"])
+                            for schema, table in sorted(st.session_state.selected_tables)
+                        ])
                         
-                        st.dataframe(selected_df, hide_index=True)
+                        
+                        st.dataframe(
+                            selected_df,
+                            hide_index=True,
+                            key="selected_tables_display"
+                        )
 
                         # Add button to start profiling
                         if st.button("Profile Selected Tables"):

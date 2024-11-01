@@ -1,0 +1,102 @@
+{
+  "BigQuery": {
+    "project_id": "your_project_id",
+    "dataset_id": "your_dataset_id",
+    "credentials": "path/to/your/credentials.json"
+  },
+  "ClickHouse": {
+    "host": "localhost",
+    "port": 9000,
+    "database": "default",
+    "user": "default",
+    "password": "default"
+  },
+  "DataFusion": {
+    "host": "localhost",
+    "port": 8080,
+    "namespace": "default"
+  },
+  "Druid": {
+    "host": "localhost",
+    "port": 8082,
+    "path": "/druid/v2/sql"
+  },
+  "DuckDB": {
+    "path": "path/to/your/database.db"
+  },
+  "Exasol": {
+    "host": "localhost",
+    "port": 8563,
+    "user": "sys",
+    "password": "exasol"
+  },
+  "Flink": {
+    "host": "localhost",
+    "port": 8081
+  },
+  "Impala": {
+    "host": "localhost",
+    "port": 21050,
+    "database": "default",
+    "auth_mechanism": "NOSASL"
+  },
+  "MSSQL": {
+    "host": "localhost",
+    "port": 1433,
+    "database": "master",
+    "user": "sa",
+    "password": "your_password"
+  },
+  "MySQL": {
+    "host": "localhost",
+    "port": 3306,
+    "database": "mysql",
+    "user": "root",
+    "password": ""
+  },
+  "Oracle": {
+    "host": "localhost",
+    "port": 1521,
+    "service_name": "orcl",
+    "user": "system",
+    "password": "oracle"
+  },
+  "Polars": {
+    "dataframe": "your_polars_dataframe"
+  },
+  "Postgres": {
+    "host": "localhost",
+    "port": 5432,
+    "database": "postgres",
+    "user": "postgres",
+    "password": "postgres"
+  },
+  "PySpark": {
+    "spark_session": "your_spark_session"
+  },
+  "RisingWave": {
+    "host": "localhost",
+    "port": 4566,
+    "database": "default",
+    "user": "root",
+    "password": "root"
+  },
+  "Snowflake": {
+    "account": "your_account_name",
+    "user": "your_username",
+    "password": "your_password",
+    "database": "your_database",
+    "schema": "your_schema",
+    "warehouse": "your_warehouse"
+  },
+  "SQlite": {
+    "database": "path/to/your/database.db"
+  },
+  "Trino": {
+    "host": "localhost",
+    "port": 8080,
+    "user": "admin",
+    "catalog": "hive",
+    "schema": "default"
+  }
+}
