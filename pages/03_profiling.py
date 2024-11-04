@@ -21,6 +21,8 @@ def get_profiled_tables():
         
         # Process each table to get metrics using Ibis
         table_metrics = []
+        invalid_records = []
+        
         for _, row in tables.iterrows():
             try:
                 # Create Ibis connection to summary parquet
@@ -40,12 +42,42 @@ def get_profiled_tables():
                     'schema_name': row['schema_name'],
                     'table_name': row['table_name'],
                     'profile_date': row['last_profiled'],
-                    'column_count': int(metrics['column_count'].iloc[0]),  # Fixed here
-                    'row_count': int(metrics['row_count'].iloc[0])        # Fixed here
+                    'column_count': int(metrics['column_count'].iloc[0]),
+                    'row_count': int(metrics['row_count'].iloc[0])
                 })
             except Exception as e:
                 st.warning(f"Could not fetch metrics for {row['schema_name']}.{row['table_name']}: {str(e)}")
+                invalid_records.append({
+                    'connection_name': row['connection_name'],
+                    'schema_name': row['schema_name'],
+                    'table_name': row['table_name']
+                })
                 continue
+        
+        # Remove invalid records from the catalog
+        if invalid_records:
+            try:
+                # Create direct DuckDB connection
+                import duckdb
+                duckdb_conn = duckdb.connect('profiles.db')
+                
+                for record in invalid_records:
+                    delete_sql = """
+                    DELETE FROM profile_catalog 
+                    WHERE connection_name = ? 
+                    AND schema_name = ? 
+                    AND table_name = ?
+                    """
+                    duckdb_conn.execute(delete_sql, 
+                                      [record['connection_name'],
+                                       record['schema_name'],
+                                       record['table_name']])
+                
+                duckdb_conn.commit()
+                duckdb_conn.close()
+                st.info(f"Removed {len(invalid_records)} invalid records from the catalog")
+            except Exception as e:
+                st.error(f"Error removing invalid records from catalog: {str(e)}")
                 
         return pd.DataFrame(table_metrics)
     except Exception as e:

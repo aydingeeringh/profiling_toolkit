@@ -2,8 +2,59 @@ import streamlit as st
 import ibis
 import json
 import pyodbc
+import duckdb
+import pandas as pd
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
+import os
+import csv
+
+def detect_delimiter(file_path: str) -> str:
+    """Detect the delimiter in a CSV file"""
+    try:
+        # Read first few lines of the file
+        with open(file_path, 'r') as file:
+            sample = file.readline() + file.readline()
+        
+        # Count potential delimiters
+        delimiters = {
+            ',': sample.count(','),
+            ';': sample.count(';'),
+            '\t': sample.count('\t'),
+            '|': sample.count('|')
+        }
+        
+        # Return the delimiter with highest count
+        return max(delimiters.items(), key=lambda x: x[1])[0]
+    except Exception as e:
+        st.error(f"Error detecting delimiter: {str(e)}")
+        return ','
+
+def preview_csv(file_path: str, delimiter: str, quotechar: str, has_header: bool) -> pd.DataFrame:
+    """Preview first 5 rows of CSV file"""
+    try:
+        df = pd.read_csv(
+            file_path,
+            delimiter=delimiter,
+            quotechar=quotechar,
+            header=0 if has_header else None,
+            nrows=5
+        )
+        return df
+    except Exception as e:
+        st.error(f"Error previewing CSV: {str(e)}")
+        return None
+
+def get_column_types(df: pd.DataFrame) -> Dict[str, str]:
+    """Get column types from DataFrame"""
+    type_mapping = {
+        'int64': 'INTEGER',
+        'float64': 'DOUBLE',
+        'object': 'VARCHAR',
+        'bool': 'BOOLEAN',
+        'datetime64[ns]': 'TIMESTAMP'
+    }
+    return {col: type_mapping.get(str(df[col].dtype), 'VARCHAR') for col in df.columns}
 
 def load_backend_configs() -> Dict[str, Dict[str, Any]]:
     """Load backend configurations from backends.json"""
@@ -81,11 +132,9 @@ def main():
     tab1, tab2 = st.tabs(["Create Connection", "Manage Connections"])
 
     with tab1:
-        # Load available backends from backends.json
         backends = load_backend_configs()
-        db_options = sorted(backends.keys())
+        db_options = sorted(list(backends.keys()) + ["CSV"])
 
-        # Store selected database in session state
         st.session_state.selected_db = st.selectbox(
             "Select a database system:",
             db_options,
@@ -94,25 +143,207 @@ def main():
         )
 
         if st.session_state.selected_db:
-            # Connection name input
             st.session_state.connection_name = st.text_input(
                 "Connection name", 
                 value=f"{st.session_state.selected_db}_connection",
                 key="connection_name_create"
             )
 
-            # Get connection parameters for selected database
-            params = get_connection_params(st.session_state.selected_db)
-            st.session_state.connection_params = {}
+            if st.session_state.selected_db == "CSV":
+                file_path = st.text_input("CSV File Path", 
+                                        help="Provide the full path to your CSV file")
+                
+                if file_path and os.path.exists(file_path):
+                    # CSV Import Options
+                    st.subheader("CSV Import Options")
+                    
+                    # Detect delimiter
+                    detected_delimiter = detect_delimiter(file_path)
+                    delimiter_options = {
+                        'Comma (,)': ',',
+                        'Semicolon (;)': ';',
+                        'Tab (\\t)': '\t',
+                        'Pipe (|)': '|',
+                        'Custom': 'custom'
+                    }
+                    
+                    delimiter_choice = st.selectbox(
+                        "Delimiter",
+                        options=list(delimiter_options.keys()),
+                        index=list(delimiter_options.values()).index(detected_delimiter) if detected_delimiter in delimiter_options.values() else 0
+                    )
+                    
+                    if delimiter_choice == 'Custom':
+                        delimiter = st.text_input("Enter custom delimiter", value=detected_delimiter)
+                    else:
+                        delimiter = delimiter_options[delimiter_choice]
 
-            # Create input fields for connection parameters
-            st.subheader("Connection Parameters")
-            
+                    # Quote character
+                    quote_options = {
+                        'Double Quote (")': '"',
+                        "Single Quote (')": "'",
+                        'None': ''
+                    }
+                    quote_choice = st.selectbox("Quote Character", options=list(quote_options.keys()))
+                    quotechar = quote_options[quote_choice]
+
+                    # Header option
+                    has_header = st.checkbox("File has header", value=True)
+
+                    # Preview data
+                    st.subheader("Preview Data")
+                    df_preview = preview_csv(file_path, delimiter, quotechar, has_header)
+                    
+                    if df_preview is not None:
+                        st.dataframe(df_preview)
+
+                        # Improved Column Type UI
+                        st.subheader("Column Types")
+                        
+                        # Auto-detect toggle
+                        auto_detect = st.checkbox("Auto-detect column types", value=True)
+                        
+                        if auto_detect:
+                            column_types = get_column_types(df_preview)
+                            
+                            # Display auto-detected types in a table format
+                            type_df = pd.DataFrame({
+                                'Column Name': column_types.keys(),
+                                'Detected Type': column_types.values()
+                            })
+                            st.table(type_df)
+                            
+                        else:
+                            # Manual column type selection with improved UI
+                            sql_types = ['INTEGER', 'DOUBLE', 'VARCHAR', 'BOOLEAN', 'TIMESTAMP', 'DATE']
+                            column_types = {}
+                            
+                            # Create a container for the column type selection
+                            with st.container():
+                                # Use tabs to organize column types by category
+                                st.markdown("#### Configure Column Types")
+                                
+                                # Create a DataFrame for the column type selection
+                                type_data = []
+                                for col in df_preview.columns:
+                                    # Get sample values for the column
+                                    sample_values = df_preview[col].head(3).tolist()
+                                    sample_str = ", ".join(str(x) for x in sample_values)
+                                    
+                                    # Auto-detect initial type
+                                    initial_type = get_column_types(df_preview)[col]
+                                    
+                                    type_data.append({
+                                        "Column": col,
+                                        "Sample Values": sample_str,
+                                        "Type": initial_type
+                                    })
+                                
+                                # Create selection UI
+                                for i, row in enumerate(type_data):
+                                    col1, col2, col3 = st.columns([2, 3, 2])
+                                    
+                                    with col1:
+                                        st.text(row["Column"])
+                                    
+                                    with col2:
+                                        st.text(f"Sample: {row['Sample Values'][:50]}...")
+                                    
+                                    with col3:
+                                        column_types[row["Column"]] = st.selectbox(
+                                            "Type",
+                                            options=sql_types,
+                                            index=sql_types.index(row["Type"]) if row["Type"] in sql_types else 0,
+                                            key=f"type_{i}",
+                                            label_visibility="collapsed"
+                                        )
+                                
+                                # Add quick type selection buttons
+                                st.markdown("#### Quick Type Selection")
+                                col1, col2, col3, col4 = st.columns(4)
+                                
+                                with col1:
+                                    if st.button("All VARCHAR"):
+                                        for col in df_preview.columns:
+                                            column_types[col] = "VARCHAR"
+                                        st.rerun()
+                                
+                                with col2:
+                                    if st.button("All INTEGER"):
+                                        for col in df_preview.columns:
+                                            column_types[col] = "INTEGER"
+                                        st.rerun()
+                                
+                                with col3:
+                                    if st.button("All DOUBLE"):
+                                        for col in df_preview.columns:
+                                            column_types[col] = "DOUBLE"
+                                        st.rerun()
+                                
+                                with col4:
+                                    if st.button("Reset to Auto-detected"):
+                                        column_types = get_column_types(df_preview)
+                                        st.rerun()
+
+                        # Import to DuckDB with specified options
+                        if st.button("Import CSV", type="primary"):
+                            try:
+                                conn = duckdb.connect("flatfiles.db")
+                                
+                                # Create table name from file name
+                                table_name = Path(file_path).stem.lower().replace(" ", "_")
+                                
+                                # Show selected configuration
+                                st.write("Configuration Summary:")
+                                config_df = pd.DataFrame({
+                                    'Setting': ['Table Name', 'Delimiter', 'Quote Character', 'Has Header'],
+                                    'Value': [table_name, delimiter, quotechar, has_header]
+                                })
+                                st.dataframe(config_df)
+                                
+                                # Show column types
+                                st.write("Column Types:")
+                                types_df = pd.DataFrame({
+                                    'Column': column_types.keys(),
+                                    'Type': column_types.values()
+                                })
+                                st.dataframe(types_df)
+                                
+                                # Construct CREATE TABLE statement with column types
+                                columns_def = ", ".join([f'"{col}" {dtype}' for col, dtype in column_types.items()])
+                                create_table_sql = f"""
+                                CREATE TABLE IF NOT EXISTS {table_name} (
+                                    {columns_def}
+                                )
+                                """
+                                conn.execute(create_table_sql)
+                                
+                                # Import data
+                                copy_sql = f"""
+                                COPY {table_name} FROM '{file_path}' 
+                                (DELIMITER '{delimiter}', 
+                                HEADER {str(has_header).lower()},
+                                QUOTE '{quotechar if quotechar else ""}')
+                                """
+                                conn.execute(copy_sql)
+                                conn.close()
+                                
+                                # Store DuckDB parameters
+                                st.session_state.connection_params = {"path": "flatfiles.db"}
+                                st.success(f"CSV file imported as table: {table_name}")
+                                
+                            except Exception as e:
+                                st.error(f"Error importing CSV: {str(e)}")
+                elif file_path:
+                    st.error("File not found. Please check the path and try again.")
+
             # Special handling for MSSQL to include driver selection
-            if st.session_state.selected_db.lower() == "mssql":
-                # Add other MSSQL parameters
+            elif st.session_state.selected_db.lower() == "mssql":
+                params = get_connection_params(st.session_state.selected_db)
+                st.session_state.connection_params = {}
+                
                 for param, default_value in params.items():
-                    if param != 'driver':  # Skip driver as it's handled above
+                    if param != 'driver':
                         st.session_state.connection_params[param] = (
                             st.text_input(
                                 param,
@@ -122,7 +353,6 @@ def main():
                             )
                         )
 
-                # Get available SQL Server drivers
                 drivers = [driver for driver in pyodbc.drivers()]
                 driver = st.selectbox(
                     "Select SQL Server Driver",
@@ -133,6 +363,8 @@ def main():
                 
             else:
                 # Handle other database types normally
+                params = get_connection_params(st.session_state.selected_db)
+                st.session_state.connection_params = {}
                 for param, default_value in params.items():
                     st.session_state.connection_params[param] = (
                         st.text_input(
@@ -148,18 +380,28 @@ def main():
             # Test connection button
             with col1:
                 if st.button("Test Connection", key="test_conn_create"):
-                    conn = create_connection(st.session_state.selected_db, st.session_state.connection_params)
+                    if st.session_state.selected_db == "CSV":
+                        conn = create_connection("duckdb", {"path": "flatfiles.db"})
+                    else:
+                        conn = create_connection(st.session_state.selected_db, st.session_state.connection_params)
                     if conn:
                         st.success("Connection successful!")
 
             # Save connection button
             with col2:
                 if st.button("Save Connection", key="save_conn_create"):
-                    save_connection(
-                        st.session_state.connection_name, 
-                        st.session_state.selected_db, 
-                        st.session_state.connection_params
-                    )
+                    if st.session_state.selected_db == "CSV":
+                        save_connection(
+                            st.session_state.connection_name,
+                            "duckdb",
+                            {"path": "flatfiles.db"}
+                        )
+                    else:
+                        save_connection(
+                            st.session_state.connection_name, 
+                            st.session_state.selected_db, 
+                            st.session_state.connection_params
+                        )
                     st.success(f"Connection '{st.session_state.connection_name}' saved successfully!")
 
     with tab2:
@@ -167,7 +409,6 @@ def main():
         saved_connections = load_saved_connections()
         
         if saved_connections:
-            # Create a selection box for choosing a connection to manage
             selected_connection = st.selectbox(
                 "Select a connection to manage",
                 list(saved_connections.keys()),
@@ -183,7 +424,6 @@ def main():
 
                 with col1:
                     if st.button("Edit Connection", key="edit_conn_btn"):
-                        # Store the connection details in session state for editing
                         st.session_state['editing_connection'] = selected_connection
                         st.session_state['editing_details'] = conn_details
                         st.rerun()
@@ -194,11 +434,9 @@ def main():
                         st.success(f"Connection '{selected_connection}' deleted successfully!")
                         st.rerun()
 
-                # Edit connection form
                 if st.session_state.get('editing_connection') == selected_connection:
                     st.subheader("Edit Connection")
                     
-                    # Add connection name editing
                     new_connection_name = st.text_input(
                         "Connection Name",
                         selected_connection,
@@ -224,14 +462,11 @@ def main():
 
                     with col2:
                         if st.button("Save Changes", key="save_changes_btn"):
-                            # Delete old connection if name changed
                             if new_connection_name != selected_connection:
                                 delete_connection(selected_connection)
                             
-                            # Save with new name and parameters
                             save_connection(new_connection_name, conn_details['type'], new_params)
                             st.success("Changes saved successfully!")
-                            # Clear editing state
                             st.session_state.pop('editing_connection', None)
                             st.session_state.pop('editing_details', None)
                             st.rerun()

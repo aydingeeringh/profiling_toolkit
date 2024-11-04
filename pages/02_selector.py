@@ -6,6 +6,7 @@ import pandas as pd
 import duckdb
 from datetime import datetime
 from typing import Dict, Any, Optional
+from st_aggrid import GridOptionsBuilder, AgGrid, GridUpdateMode, DataReturnMode
 
 def load_saved_connections():
     """Load saved connections from a JSON file"""
@@ -220,9 +221,9 @@ def generate_profile(connection, schema, table, progress_bar, connection_name):
 def main():
     st.title("Database Explorer")
 
-    # Initialize session state for selected tables if it doesn't exist
+    # Initialize session state for selected tables
     if 'selected_tables' not in st.session_state:
-        st.session_state.selected_tables = set()  # Store as {(schema, table), ...}
+        st.session_state.selected_tables = set()
 
     # Load saved connections
     saved_connections = load_saved_connections()
@@ -256,122 +257,114 @@ def main():
             schema_info = get_schema_info(conn)
 
             if schema_info:
-                # Create schema dropdown with "All Schemas" option
-                schema_options = ["All Schemas"] + list(schema_info.keys())
-                selected_schema = st.selectbox(
-                    "Select Schema",
-                    options=schema_options,
-                    index=0
-                )
-
-                # Create a list of all tables with their schemas
+                # Create table data
                 table_data = []
                 for schema, tables in schema_info.items():
-                    # Only include tables from selected schema or all schemas
-                    if selected_schema == "All Schemas" or schema == selected_schema:
-                        for table in tables:
-                            table_data.append({
-                                "Schema": schema,
-                                "Table": table,
-                                "Select": (schema, table) in st.session_state.selected_tables
-                            })
+                    for table in tables:
+                        table_data.append({
+                            "Schema": schema,
+                            "Table": table,
+                        })
 
                 # Convert to DataFrame and sort
                 df = pd.DataFrame(table_data)
-                if not df.empty:
-                    df = df.sort_values(["Schema", "Table"])
+        
 
-                    # Function to handle selection changes
-                    def handle_selection():
-                        if 'table_editor' in st.session_state:
-                            edited_data = st.session_state.table_editor
-                            
-                            # Get the current DataFrame
-                            current_df = df.copy()
-                            
-                            # Update the selections based on edited rows
-                            for row_idx, changes in edited_data['edited_rows'].items():
-                                row_idx = int(row_idx)
-                                if 'Select' in changes:
-                                    row = current_df.iloc[row_idx]
-                                    if changes['Select']:
-                                        st.session_state.selected_tables.add((row['Schema'], row['Table']))
-                                    else:
-                                        st.session_state.selected_tables.discard((row['Schema'], row['Table']))
+                # Configure grid options
+                gb = GridOptionsBuilder.from_dataframe(df)
+                
+                # Configure Schema column for grouping and selection
+                gb.configure_column("Schema", 
+                    rowGroup=True,
+                    headerCheckboxSelection=True,
+                    headerCheckboxSelectionFilteredOnly=True,
+                    checkboxSelection=True,
+                    autoSize=True,
+                    showRowGroup=True
+                )
 
-                    # Display editable table with checkboxes
-                    edited_df = st.data_editor(
-                        df,
-                        column_config={
-                            "Schema": st.column_config.TextColumn(
-                                "Schema",
-                                disabled=True,
-                            ),
-                            "Table": st.column_config.TextColumn(
-                                "Table",
-                                disabled=True,
-                            ),
-                            "Select": st.column_config.CheckboxColumn(
-                                "Select",
-                                help="Select table for profiling",
-                            )
-                        },
-                        hide_index=True,
-                        key="table_editor",
-                        on_change=handle_selection
-                    )
+                # Configure Table column
+                gb.configure_column("Table",
+                    checkboxSelection=True,
+                    headerCheckboxSelection=True,
+                    headerCheckboxSelectionFilteredOnly=True,
+                    autoSize=True
+                )
 
-                    # Display selected tables
-                    if st.session_state.selected_tables:
-                        st.subheader("Selected Tables")
-                        selected_df = pd.DataFrame([
-                            {"Schema": schema, "Table": table}
-                            for schema, table in sorted(st.session_state.selected_tables)
-                        ])
-                        
-                        
-                        st.dataframe(
-                            selected_df,
-                            hide_index=True,
-                            key="selected_tables_display"
-                        )
+                # Configure selection
+                gb.configure_selection(
+                    selection_mode="multiple",
+                    use_checkbox=True,
+                    groupSelectsChildren=True,
+                    groupSelectsFiltered=True
+                )
 
-                        # Add button to start profiling
-                        if st.button("Profile Selected Tables"):
-                            datetime.now()
-                            
-                            # Create containers for progress and timing
-                            progress_container = st.container()
-                            st.container()
-                            
-                            # Store timings for summary
-                            table_timings = []
-                            
-                            # Profile each table with its own progress bar
-                            for schema, table in st.session_state.selected_tables:
-                                with progress_container:
-                                    st.write(f"Profiling {schema}.{table}")
-                                    progress_bar = st.progress(0)
-                                    success, duration = generate_profile(
-                                        conn, 
-                                        schema, 
-                                        table, 
-                                        progress_bar,
-                                        selected_connection
-                                    )
-                                    if success:
-                                        table_timings.append({
-                                            'schema': schema,
-                                            'table': table,
-                                            'duration': duration
-                                        })
+                # Configure grid behavior
+                gridOptions = gb.build()
+                
+                # Add additional grid options for group selection
+                gridOptions['groupSelectsChildren'] = True
+                gridOptions['groupDefaultExpanded'] = 0
+                gridOptions['rowSelection'] = 'multiple'
+                gridOptions['suppressRowClickSelection'] = True
+                gridOptions['groupSelectsFiltered'] = True
 
+                # Remove the extra Schema column
+                gridOptions['columnDefs'] = [{
+                    **col,
+                    'autoSize': True,
+                    'resizable': True,
+                    'hide': True if col['field'] == 'Schema' else False
+                } for col in gridOptions['columnDefs']]
 
+                # Display the grid
+                grid_response = AgGrid(
+                    df,
+                    gridOptions=gridOptions,
+                    height=600,
+                    width="100%",
+                    data_return_mode=DataReturnMode.FILTERED_AND_SORTED,
+                    update_mode=GridUpdateMode.MODEL_CHANGED,
+                    fit_columns_on_grid_load=True,
+                    allow_unsafe_jscode=True,
+                    enable_enterprise_modules=True
+                )
+
+                # Get selected rows as a DataFrame
+                selected_rows = grid_response.selected_rows
+
+                # Debug print
+
+                # Check if there are any selected rows
+                if selected_rows is not None and len(selected_rows) > 0:
+                    st.write("Selected rows:", selected_rows)
+                    # Create a button to trigger profiling
+                    if st.button("Profile Selected Tables"):
+                        with st.spinner("Profiling selected tables..."):
+                            for _, row in pd.DataFrame(selected_rows).iterrows():
+                                schema = row['Schema']
+                                table = row['Table']
+                                
+                                # Create a progress bar for each table
+                                progress_bar = st.progress(0)
+                                st.write(f"Profiling {schema}.{table}")
+                                
+                                # Generate profile for the selected table
+                                success, duration = generate_profile(
+                                    connection=conn,
+                                    schema=schema,
+                                    table=table,
+                                    progress_bar=progress_bar,
+                                    connection_name=selected_connection
+                                )
+                                
+                                if success:
+                                    st.success(f"Successfully profiled {schema}.{table} in {duration}")
+                                else:
+                                    st.error(f"Failed to profile {schema}.{table}")
                 else:
-                    st.info("No tables match the criteria")
+                    st.info("Please select tables to profile")
 
-            else:
-                st.warning("No schemas or tables found in the database.")
 
 if __name__ == "__main__":
     main()
