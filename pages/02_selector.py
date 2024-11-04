@@ -219,7 +219,9 @@ def generate_profile(connection, schema, table, progress_bar, connection_name):
         return None, None
 
 def main():
-    st.title("Database Explorer")
+    st.title("Connection Explorer")
+
+    st.logo("https://infoblueprint.co.za/wp-content/uploads/2021/06/infoblueprint-logo-600px.png")
 
     # Initialize session state for selected tables
     if 'selected_tables' not in st.session_state:

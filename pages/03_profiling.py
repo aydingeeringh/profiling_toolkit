@@ -470,6 +470,8 @@ def get_pattern_matches(connection_name, schema, table, column, pattern):
 def main():
     st.title("Table Profile Viewer")
 
+    st.logo("https://infoblueprint.co.za/wp-content/uploads/2021/06/infoblueprint-logo-600px.png")
+
     # Get list of profiled tables
     profiled_tables = get_profiled_tables()
 

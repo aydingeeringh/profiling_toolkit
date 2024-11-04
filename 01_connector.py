@@ -118,7 +118,9 @@ def create_connection(db_type: str, params: Dict[str, Any]) -> Optional[ibis.Bas
         return None
 
 def main():
-    st.title("Database Connection Manager")
+    st.title("Connection Manager")
+
+    st.logo("https://infoblueprint.co.za/wp-content/uploads/2021/06/infoblueprint-logo-600px.png")
 
     # Initialize session state variables if they don't exist
     if 'selected_db' not in st.session_state:
