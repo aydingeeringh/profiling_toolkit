@@ -126,10 +126,13 @@ def generate_profile(connection, schema, table, progress_bar, connection_name):
                 pattern_expressions[col] = (
                     parquet_table[col]
                     .cast('string')
+                    # Replace lowercase letters with lowercase a
+                    .re_replace(r'[a-z]', 'a')
+                    # Replace uppercase letters with uppercase A
+                    .re_replace(r'[A-Z]', 'A')
+                    # Replace numbers with N
                     .re_replace(r'[0-9]', 'N')
-                    .re_replace(r'[^a-zA-Z0-9]', '')
-                    .re_replace(r'[a-zA-Z]', 'a')
-                ).name(col)  # Add explicit column naming
+                ).name(col)
         
         # Generate patterns table if there are string columns
         if pattern_expressions:

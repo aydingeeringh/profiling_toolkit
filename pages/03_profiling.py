@@ -445,9 +445,12 @@ def get_pattern_matches(connection_name, schema, table, column, pattern):
         pattern_expr = (
             table_data[column]
             .cast('string')
-            .re_replace('[0-9]', 'N')
-            .re_replace('[^a-zA-Z0-9]', '')
-            .re_replace('[a-zA-Z]', 'a')
+            # Replace lowercase letters with lowercase a
+            .re_replace(r'[a-z]', 'a')
+            # Replace uppercase letters with uppercase A
+            .re_replace(r'[A-Z]', 'A')
+            # Replace numbers with N
+            .re_replace(r'[0-9]', 'N')
         )
         
         # Filter for matching values

@@ -5,9 +5,8 @@ import pyodbc
 import duckdb
 import pandas as pd
 from pathlib import Path
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any
 import os
-import csv
 
 def detect_delimiter(file_path: str) -> str:
     """Detect the delimiter in a CSV file"""
