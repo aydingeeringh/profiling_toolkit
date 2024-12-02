@@ -138,63 +138,116 @@ def get_column_metrics(connection_name, schema, table, column):
             .iloc[0]
         )
         
-        # Read data using Ibis
+        # Read data using DuckDB directly for better string handling
+        import duckdb
+        conn = duckdb.connect()
+        df = conn.read_parquet(data_path).df()
+        
+        # Get column type from the original Ibis connection
         data_con = ibis.duckdb.connect()
         table_data = data_con.read_parquet(data_path)
         column_data = table_data[column]
-        
-        # Get column type
         column_type = str(column_data.type())
         
         # Create metrics based on data type
         if 'string' in column_type.lower():
-            metrics = (
+            # Filter out nulls and empty strings
+            non_empty_df = df[df[column].notna() & (df[column].str.strip() != '')]
+            
+            # Get basic metrics
+            basic_metrics = pd.DataFrame({
+                'count': [len(df)],
+                'null_count': [df[column].isna().sum()],
+                'unique_count': [df[column].nunique()]
+            })
+            
+            # Get min/max using normalized strings
+            if not non_empty_df.empty:
+                # Normalize strings for comparison
+                normalized = non_empty_df[column].str.strip().str.upper().str.replace(r'[^\w\s]', '')
+                
+                # Get original values corresponding to min/max of normalized strings
+                min_value = non_empty_df.loc[normalized.idxmin(), column]
+                max_value = non_empty_df.loc[normalized.idxmax(), column]
+                
+                non_empty_metrics = pd.DataFrame({
+                    'min_value': [min_value],
+                    'max_value': [max_value]
+                })
+            else:
+                non_empty_metrics = pd.DataFrame({
+                    'min_value': [None],
+                    'max_value': [None]
+                })
+            
+            # Get length metrics
+            if not non_empty_df.empty:
+                lengths = non_empty_df[column].str.len()
+                length_metrics = pd.DataFrame({
+                    'min_length': [lengths.min()],
+                    'max_length': [lengths.max()],
+                    'avg_length': [lengths.mean()]
+                })
+            else:
+                length_metrics = pd.DataFrame({
+                    'min_length': [0],
+                    'max_length': [0],
+                    'avg_length': [0]
+                })
+            
+            # Combine all metrics
+            return pd.concat([basic_metrics, non_empty_metrics, length_metrics], axis=1)
+            
+        elif 'int' in column_type.lower() or 'float' in column_type.lower() or 'decimal' in column_type.lower():
+            # Filter out nulls
+            non_null_data = table_data.filter(column_data.notnull())
+            
+            # Get basic metrics from original table
+            basic_metrics = (
                 table_data.aggregate([
-                    column_data.min().name('min_value'),
-                    column_data.max().name('max_value'),
                     column_data.count().name('count'),
                     column_data.isnull().sum().name('null_count'),
                     column_data.nunique().name('unique_count')
                 ])
             ).execute()
             
-            # Add length metrics
-            length_metrics = (
-                table_data.mutate(str_len=column_data.length())
-                .aggregate([
-                    ibis._.str_len.min().name('min_length'),
-                    ibis._.str_len.max().name('max_length'),
-                    ibis._.str_len.mean().name('avg_length')
+            # Get statistical metrics from filtered data
+            stat_metrics = (
+                non_null_data.aggregate([
+                    non_null_data[column].min().name('min_value'),
+                    non_null_data[column].max().name('max_value'),
+                    non_null_data[column].mean().name('mean'),
+                    non_null_data[column].std().name('std_dev'),
+                    non_null_data[column].approx_median().name('median')
                 ])
             ).execute()
             
             # Combine metrics
-            return pd.concat([metrics, length_metrics], axis=1)
-            
-        elif 'int' in column_type.lower() or 'float' in column_type.lower() or 'decimal' in column_type.lower():
-            return (
-                table_data.aggregate([
-                    column_data.min().name('min_value'),
-                    column_data.max().name('max_value'),
-                    column_data.mean().name('mean'),
-                    column_data.std().name('std_dev'),
-                    column_data.approx_median().name('median'),
-                    column_data.count().name('count'),
-                    column_data.isnull().sum().name('null_count'),
-                    column_data.nunique().name('unique_count')
-                ])
-            ).execute()
+            return pd.concat([basic_metrics, stat_metrics], axis=1)
             
         elif 'date' in column_type.lower() or 'timestamp' in column_type.lower():
-            return (
+            # Filter out nulls
+            non_null_data = table_data.filter(column_data.notnull())
+            
+            # Get basic metrics from original table
+            basic_metrics = (
                 table_data.aggregate([
-                    column_data.min().name('min_value'),
-                    column_data.max().name('max_value'),
                     column_data.count().name('count'),
                     column_data.isnull().sum().name('null_count'),
                     column_data.nunique().name('unique_count')
                 ])
             ).execute()
+            
+            # Get min/max from filtered data
+            date_metrics = (
+                non_null_data.aggregate([
+                    non_null_data[column].min().name('min_value'),
+                    non_null_data[column].max().name('max_value')
+                ])
+            ).execute()
+            
+            # Combine metrics
+            return pd.concat([basic_metrics, date_metrics], axis=1)
             
         else:
             # For other types, just get basic metrics
@@ -209,6 +262,7 @@ def get_column_metrics(connection_name, schema, table, column):
     except Exception as e:
         st.error(f"Error getting column metrics: {str(e)}")
         return None
+
 
 def get_column_histogram(connection_name, schema, table, column):
     """Generate histogram data using Ibis"""
